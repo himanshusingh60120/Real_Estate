@@ -1,30 +1,34 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 import sqlite3
 from flask_bcrypt import Bcrypt
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 bcrypt = Bcrypt(app)
 
 # --- Database Configuration ---
-# The database is a single file in your project folder
 DATABASE = 'real_estate.db'
 
 # --- Database Connection Function ---
 def get_db_connection():
     try:
         conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row  # This allows you to access rows as dictionaries
+        conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as err:
         print(f"Error: {err}")
         return None
 
 # --- API Routes ---
-# ... (all your existing routes remain the same, but they will now use the new get_db_connection function)
 
+# Route to serve the main HTML file
 @app.route('/')
 def home():
-    return "Welcome to the Real Estate Project API!"
+    return send_from_directory(app.static_folder, 'index.html')
+
+# Route to serve static files (CSS, JS)
+@app.route('/<path:path>')
+def serve_static_files(path):
+    return send_from_directory(app.static_folder, path)
 
 @app.route('/properties', methods=['GET'])
 def get_properties():

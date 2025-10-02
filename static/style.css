@@ -1,0 +1,50 @@
+body {
+    font-family: sans-serif;
+    background-color: #f4f4f9;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+header {
+    text-align: center;
+    padding: 1rem 0;
+    background-color: #fff;
+    border-bottom: 1px solid #ddd;
+}
+main {
+    max-width: 900px;
+    margin: auto;
+    padding: 2rem 0;
+}
+#auth-section, #properties-section {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+input, button {
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+button {
+    cursor: pointer;
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+}
+.property-card {
+    border: 1px solid #eee;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+.property-card h3 {
+    margin-top: 0;
+}

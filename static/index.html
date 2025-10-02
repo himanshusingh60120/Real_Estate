@@ -1,0 +1,47 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('login-form');
+    const propertyList = document.getElementById('property-list');
+
+    // Handle Login Form Submission
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        const result = await response.json();
+        console.log(result);
+        alert(result.message);
+    });
+
+    // Function to fetch properties from the backend API
+    const fetchProperties = async () => {
+        const response = await fetch('/properties');
+        const properties = await response.json();
+        
+        // Clear existing properties
+        propertyList.innerHTML = '';
+
+        // Add each property to the page
+        properties.forEach(property => {
+            const propertyDiv = document.createElement('div');
+            propertyDiv.className = 'property-card';
+            propertyDiv.innerHTML = `
+                <h3>${property.title}</h3>
+                <p><strong>City:</strong> ${property.city}</p>
+                <p><strong>Price:</strong> ₹${property.price}</p>
+                <button class="like-button" data-property-id="${property.property_id}">Like</button>
+            `;
+            propertyList.appendChild(propertyDiv);
+        });
+    };
+
+    // Initial call to fetch properties when the page loads
+    fetchProperties();
+});
