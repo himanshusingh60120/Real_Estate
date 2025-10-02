@@ -1,47 +1,41 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('login-form');
-    const propertyList = document.getElementById('property-list');
-
-    // Handle Login Form Submission
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const email = document.getElementById('login-email').value;
-        const password = document.getElementById('login-password').value;
-
-        const response = await fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ email, password })
-        });
-        const result = await response.json();
-        console.log(result);
-        alert(result.message);
-    });
-
-    // Function to fetch properties from the backend API
-    const fetchProperties = async () => {
-        const response = await fetch('/properties');
-        const properties = await response.json();
-        
-        // Clear existing properties
-        propertyList.innerHTML = '';
-
-        // Add each property to the page
-        properties.forEach(property => {
-            const propertyDiv = document.createElement('div');
-            propertyDiv.className = 'property-card';
-            propertyDiv.innerHTML = `
-                <h3>${property.title}</h3>
-                <p><strong>City:</strong> ${property.city}</p>
-                <p><strong>Price:</strong> ₹${property.price}</p>
-                <button class="like-button" data-property-id="${property.property_id}">Like</button>
-            `;
-            propertyList.appendChild(propertyDiv);
-        });
-    };
-
-    // Initial call to fetch properties when the page loads
-    fetchProperties();
-});
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Estate Project</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Real Estate Listings</h1>
+    </header>
+    <main>
+        <section id="auth-section">
+            <h2>Login or Sign Up</h2>
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit">Log In</button>
+            </form>
+            <form id="signup-form">
+                <input type="email" id="signup-email" placeholder="Email" required>
+                <input type="password" id="signup-password" placeholder="Password" required>
+                <select id="user-type">
+                    <option value="tenant">Tenant</option>
+                    <option value="owner">Owner</option>
+                </select>
+                <button type="submit">Sign Up</button>
+            </form>
+        </section>
+        <section id="properties-section">
+            <h2>Available Properties</h2>
+            <div id="property-list">
+                </div>
+        </section>
+        <section id="dashboard-section">
+            </section>
+    </main>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
