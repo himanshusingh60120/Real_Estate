@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request, send_from_directory
 import sqlite3
 from flask_bcrypt import Bcrypt
 
-app = Flask(__name__, static_folder='static', template_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='templates')
 bcrypt = Bcrypt(app)
 
 # --- Database Configuration ---
