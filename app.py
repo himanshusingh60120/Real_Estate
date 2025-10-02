@@ -1,29 +1,26 @@
 from flask import Flask, jsonify, request
-import mysql.connector
+import sqlite3
 from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
 
 # --- Database Configuration ---
-# Your credentials are now hardcoded here
-db_config = {
-    'host': 'localhost',
-    'user': 'root', 
-    'password': 'kings@123',
-    'database': 'project'
-}
+# The database is a single file in your project folder
+DATABASE = 'real_estate.db'
 
 # --- Database Connection Function ---
 def get_db_connection():
     try:
-        conn = mysql.connector.connect(**db_config)
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row  # This allows you to access rows as dictionaries
         return conn
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
         return None
 
 # --- API Routes ---
+# ... (all your existing routes remain the same, but they will now use the new get_db_connection function)
 
 @app.route('/')
 def home():
@@ -34,16 +31,16 @@ def get_properties():
     conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
-
-    cursor = conn.cursor(dictionary=True)
+    
+    cursor = conn.cursor()
     query = "SELECT * FROM Properties WHERE status = 'Available';"
     cursor.execute(query)
     properties = cursor.fetchall()
-
+    
     cursor.close()
     conn.close()
-
-    return jsonify(properties)
+    
+    return jsonify([dict(row) for row in properties])
 
 @app.route('/signup', methods=['POST'])
 def signup():
@@ -51,27 +48,24 @@ def signup():
     email = data.get('email')
     password = data.get('password')
     user_type = data.get('user_type')
-
+    
     if not all([email, password, user_type]):
         return jsonify({"error": "Missing required fields"}), 400
-
+    
     conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
-
-    cursor = conn.cursor()
     
-    # Hash the password before storing it
+    cursor = conn.cursor()
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     
     try:
-        query = "INSERT INTO Users (email, password_hash, user_type) VALUES (%s, %s, %s);"
+        query = "INSERT INTO Users (email, password_hash, user_type) VALUES (?, ?, ?);"
         cursor.execute(query, (email, hashed_password, user_type))
         conn.commit()
-        
         return jsonify({"message": "User created successfully"}), 201
-    except mysql.connector.IntegrityError as err:
-        if "Duplicate entry" in str(err):
+    except sqlite3.IntegrityError as err:
+        if "UNIQUE constraint failed" in str(err):
             return jsonify({"error": "User with this email already exists"}), 409
         else:
             return jsonify({"error": "An error occurred"}), 500
@@ -79,28 +73,27 @@ def signup():
         cursor.close()
         conn.close()
 
-
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
     email = data.get('email')
     password = data.get('password')
-
+    
     conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
-    cursor = conn.cursor(dictionary=True)
-
-    query = "SELECT user_id, email, password_hash, user_type FROM Users WHERE email = %s;"
+        
+    cursor = conn.cursor()
+    query = "SELECT user_id, email, password_hash, user_type FROM Users WHERE email = ?;"
     cursor.execute(query, (email,))
     user = cursor.fetchone()
-
+    
     cursor.close()
     conn.close()
-
+    
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
-
+    
     if bcrypt.check_password_hash(user['password_hash'], password):
         return jsonify({
             "message": "Login successful",
@@ -128,7 +121,7 @@ def add_property():
     try:
         query = """
             INSERT INTO Properties (title, address, city, price, status, bedrooms, bathrooms, area_sqft, property_type, agent_id, listed_date, owner_user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         values = (
             data['title'],
@@ -149,7 +142,7 @@ def add_property():
         
         return jsonify({"message": "Property added successfully"}), 201
     
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
         return jsonify({"error": "An error occurred while adding the property"}), 500
     
@@ -162,9 +155,9 @@ def owner_dashboard(user_id):
     conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
-
-    cursor = conn.cursor(dictionary=True)
-
+    
+    cursor = conn.cursor()
+    
     query = """
     SELECT 
         p.property_id,
@@ -172,12 +165,12 @@ def owner_dashboard(user_id):
         p.price AS property_price,
         r.monthly_rent,
         (r.monthly_rent * 12) AS annual_rent,
-        ROUND((r.monthly_rent * 12 / p.price) * 100, 2) AS rental_yield_percent,
-        p.price / (r.monthly_rent * 12) AS years_to_cover_price
+        ROUND(CAST(r.monthly_rent * 12 AS REAL) / p.price * 100, 2) AS rental_yield_percent,
+        CAST(p.price AS REAL) / (r.monthly_rent * 12) AS years_to_cover_price
     FROM Properties as p
     JOIN Rentals as r 
         ON p.property_id = r.property_id
-    WHERE p.owner_user_id = %s;
+    WHERE p.owner_user_id = ?;
     """
     
     try:
@@ -187,9 +180,9 @@ def owner_dashboard(user_id):
         if not properties:
             return jsonify({"message": "No properties found for this owner."}), 404
             
-        return jsonify(properties)
+        return jsonify([dict(row) for row in properties])
         
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
         return jsonify({"error": "An error occurred while fetching properties"}), 500
     
@@ -214,14 +207,14 @@ def like_property():
     cursor = conn.cursor()
 
     try:
-        query = "INSERT INTO Property_Likes (property_id, tenant_user_id) VALUES (%s, %s);"
+        query = "INSERT INTO Property_Likes (property_id, tenant_user_id) VALUES (?, ?);"
         cursor.execute(query, (property_id, tenant_user_id))
         conn.commit()
         
         return jsonify({"message": "Property liked successfully"}), 201
     
-    except mysql.connector.IntegrityError as err:
-        if "Duplicate entry" in str(err):
+    except sqlite3.IntegrityError as err:
+        if "UNIQUE constraint failed" in str(err):
             return jsonify({"error": "You have already liked this property"}), 409
         else:
             return jsonify({"error": "An error occurred"}), 500
@@ -236,7 +229,7 @@ def get_property_likes(property_id):
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor()
 
     query = """
     SELECT 
@@ -246,7 +239,7 @@ def get_property_likes(property_id):
     FROM Property_Likes AS pl
     JOIN Users AS u ON pl.tenant_user_id = u.user_id
     JOIN Potential_Tenants AS pt ON pl.tenant_user_id = pt.tenant_id
-    WHERE pl.property_id = %s;
+    WHERE pl.property_id = ?;
     """
     
     try:
@@ -260,10 +253,10 @@ def get_property_likes(property_id):
         
         return jsonify({
             "total_likes": total_likes,
-            "interested_tenants": likers
+            "interested_tenants": [dict(row) for row in likers]
         })
         
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
         return jsonify({"error": "An error occurred while fetching likes"}), 500
     
@@ -278,10 +271,10 @@ def tenant_dashboard(user_id):
     if conn is None:
         return jsonify({"error": "Database connection failed"}), 500
 
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor()
 
     try:
-        query = "SELECT property_id FROM Property_Likes WHERE tenant_user_id = %s;"
+        query = "SELECT property_id FROM Property_Likes WHERE tenant_user_id = ?;"
         cursor.execute(query, (user_id,))
         liked_properties_data = cursor.fetchall()
         
@@ -292,7 +285,7 @@ def tenant_dashboard(user_id):
         for row in liked_properties_data:
             property_id = row['property_id']
             
-            property_query = "SELECT title, address, bedrooms, bathrooms FROM Properties WHERE property_id = %s;"
+            property_query = "SELECT title, address, bedrooms, bathrooms FROM Properties WHERE property_id = ?;"
             cursor.execute(property_query, (property_id,))
             property_details = cursor.fetchone()
 
@@ -305,18 +298,19 @@ def tenant_dashboard(user_id):
                 FROM Property_Likes AS pl
                 JOIN Users AS u ON pl.tenant_user_id = u.user_id
                 JOIN Potential_Tenants AS pt ON pl.tenant_user_id = pt.tenant_id
-                WHERE pl.property_id = %s;
+                WHERE pl.property_id = ?;
                 """
                 cursor.execute(likes_query, (property_id,))
                 interested_tenants = cursor.fetchall()
                 
-                property_details['interested_tenants'] = interested_tenants
-                property_details['total_likes'] = len(interested_tenants)
-                liked_properties_list.append(property_details)
+                property_details_dict = dict(property_details)
+                property_details_dict['interested_tenants'] = [dict(r) for r in interested_tenants]
+                property_details_dict['total_likes'] = len(interested_tenants)
+                liked_properties_list.append(property_details_dict)
         
         return jsonify(liked_properties_list)
         
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
         return jsonify({"error": "An error occurred while fetching dashboard data"}), 500
     
