@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request, send_from_directory
 import sqlite3
 from flask_bcrypt import Bcrypt
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, static_folder='static', template_folder='static')
 bcrypt = Bcrypt(app)
 
 # --- Database Configuration ---
@@ -23,7 +23,7 @@ def get_db_connection():
 # Route to serve the main HTML file
 @app.route('/')
 def home():
-    return send_from_directory(app.static_folder, 'index.html')
+    return render_template('index.html')
 
 # Route to serve static files (CSS, JS)
 @app.route('/<path:path>')
